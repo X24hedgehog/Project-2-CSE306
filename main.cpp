@@ -895,6 +895,38 @@ void test_fluid_evaluate()
   save_svg(output_polygons, positions, "test_fluid.svg");
 }
 
+// Lab 9: Tutte-embedding
+std::vector<Vector> tutte_embedding(std::vector<Vector> vertices, std::vector<Vector> boundaries, std::vector<std::vector<Vector>> adj, int num_iter, std::vector<int> interior_indexes, std::vector<int> boundary_indexes) {
+  double s = 0;
+  for (int i=0; i<boundaries.size(); i++) {
+    s += norm(boundaries[i+1] - boundaries[i]);
+  }
+  double cs = 0;
+  for (int i = 0; i< boundaries.size(); i++) {
+    double theta = 2*M_PI*cs/s;
+    vertices[i] = Vector(cos(theta), sin(theta));
+    cs += norm(boundaries[i+1] - boundaries[i]);
+  }
+  for (int i=0; i<num_iter; i++) {
+    std::vector<Vector> current_vertices = vertices;
+    for (int v=0; v < interior_indexes.size(); v++) {
+      int current_index = interior_indexes[v];
+      current_vertices[current_index] = Vector(0, 0);
+      int num_neighbor = adj[current_index].size();
+      for (int n = 0; n < num_neighbor; n++) {
+        current_vertices[current_index] = current_vertices[current_index] + adj[current_index][n];
+      }
+      current_vertices[current_index] = current_vertices[current_index] / num_neighbor;
+    }
+    for (int v=0; v < boundary_indexes.size(); v++) {
+      current_vertices[boundary_indexes[v]] = vertices[boundary_indexes[v]];
+    }
+    vertices = current_vertices;
+  }
+  return vertices;
+}
+
+
 int main(int argc, char **argv)
 {
   generate_diagram();
