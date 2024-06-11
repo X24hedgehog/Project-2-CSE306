@@ -2,6 +2,7 @@
 #include <vector>
 
 #include <math.h>
+#include <cmath>
 #include <ctime>
 #include <iostream>
 #define M_PI 3.14159265358979323846
@@ -12,6 +13,23 @@
 #include <random>
 #include <omp.h>
 #include "lbfgs.h"
+// #include <stb_image_write.h>
+#include <sstream>
+
+std::random_device my_random_device;
+std::default_random_engine my_random_engine(my_random_device());
+std::uniform_real_distribution<float> my_distribution(0, 1);
+std::uniform_real_distribution<float> my_weight_distribution(0.8, 1);
+
+double generate()
+{
+  return my_distribution(my_random_engine);
+}
+
+double generate_weight()
+{
+  return my_weight_distribution(my_random_engine);
+}
 
 class Vector
 {
@@ -34,6 +52,10 @@ public:
     double n = norm();
     data[0] /= n;
     data[1] /= n;
+  }
+  void print_position()
+  {
+    std::cout << "x: " << data[0] << "  " << "y: " << data[1] << std::endl;
   }
   double operator[](int i) const { return data[i]; };
   double &operator[](int i) { return data[i]; };
@@ -100,7 +122,6 @@ Vector check_intersect_voronoi(Vector A, Vector B, std::pair<Vector, Vector> l, 
   Vector u = l.first;
   Vector v = l.second;
   Vector M = (u + v) / 2 + (w1 - w2) / (2 * pow(norm(v - u), 2)) * (v - u);
-  // std::cout << M[0] << " " << M[1] << std::endl;
   Vector N = u - v;
   double t = dot(M - A, N) / dot(B - A, N);
   if (t < 0 || t > 1)
@@ -126,7 +147,6 @@ bool check_inside_voronoi(Vector X, std::pair<Vector, Vector> edge, double w1, d
   Vector u = edge.first;
   Vector v = edge.second;
   Vector M = (u + v) / 2 + (w1 - w2) / (2 * pow(norm(v - u), 2)) * (v - u);
-  // std::cout << M[0] << " " << M[1] << std::endl;
   if (dot(X - M, v - u) < 0)
   {
     return true;
@@ -169,11 +189,12 @@ public:
 
   void print_vertices()
   {
+    std::cout << "Start printing vertices of a polygon" << std::endl;
     for (int i = 0; i < vertices.size(); i++)
     {
-      std::cout << vertices[i][0] << "    " << vertices[i][1] << std::endl;
+      std::cout << "Coord x: " << vertices[i][0] << "    " << "Coord y: " << vertices[i][1] << std::endl;
     }
-    std::cout << "End of a polygon" << std::endl;
+    std::cout << " " << std::endl;
   }
 
   void clip_edge_voronoi(std::pair<Vector, Vector> edge, double w1, double w2)
@@ -187,26 +208,18 @@ public:
       Vector intersection = check_intersect_voronoi(prevVertex, curVertex, edge, w1, w2);
       if (check_inside_voronoi(curVertex, edge, w1, w2))
       {
-        // std::cout << "curVertex inside" << std::endl;
         if (!check_inside_voronoi(prevVertex, edge, w1, w2))
         {
-          // std::cout << "prevVertex not inside" << std::endl;
           outPolygon.vertices.push_back(intersection);
         }
         outPolygon.vertices.push_back(curVertex);
       }
       else if (check_inside_voronoi(prevVertex, edge, w1, w2))
       {
-        // std::cout << "curVertext not inside but prevVertext inside" << std::endl;
         outPolygon.vertices.push_back(intersection);
-      }
-      else
-      {
-        // std::cout << "Both not inside" << std::endl;
       }
     }
     this->vertices = outPolygon.vertices;
-    // this->print_vertices();
   }
 
   void clip_polygon(Polygon c)
@@ -223,26 +236,83 @@ public:
       {
         prev_index = c.vertices.size() - 1;
       }
-      std::pair<Vector, Vector> clipEdge(c.vertices[i], c.vertices[prev_index]);
+      std::pair<Vector, Vector> clipEdge(c.vertices[prev_index], c.vertices[i]);
       outPolygon = Polygon();
-      for (int i = 0; i < vertices.size(); i++)
+      // std::cout << "Clip polygon edge:" << std::endl;
+      // std::cout << "Point 1: " << c.vertices[prev_index][0] << " and " << c.vertices[prev_index][1] << std::endl;
+      // std::cout << "Point 2: " << c.vertices[i][0] << " and " << c.vertices[i][1] << std::endl;
+      // c.vertices[prev_index].print_position();
+      // c.vertices[i].print_position();
+      // std::cout << " " << std::endl;
+      // std::cout << "New subject polygon: " << std::endl;
+      // this->print_vertices();
+      for (int j = 0; j < this->vertices.size(); j++)
       {
-        Vector curVertex = vertices[i];
-        Vector prevVertex = vertices[(i > 0) ? (i - 1) : vertices.size() - 1];
+        Vector curVertex = vertices[j];
+        Vector prevVertex = vertices[(j > 0) ? (j - 1) : vertices.size() - 1];
+        // std::cout << "Subject polygon edge:" << std::endl;
+        // prevVertex.print_position();
+        // curVertex.print_position();
         Vector intersection = check_intersect(prevVertex, curVertex, clipEdge);
+        // std::cout << "Intersect: " << std::endl;
+        // intersection.print_position();
         if (check_inside(curVertex, clipEdge))
         {
+          // std::cout << "Current vertext " << curVertex[0] << " " << curVertex[1] << " inside clip edge" << std::endl;
           if (!check_inside(prevVertex, clipEdge))
+          {
+            // std::cout << "Previous vertext " << prevVertex[0] << " " << prevVertex[1] << " not inside clip edge" << std::endl;
             outPolygon.vertices.push_back(intersection);
+            // std::cout << "outPolygon add intersection " << intersection[0] << " " << intersection[1] << std::endl;
+          }
+
           outPolygon.vertices.push_back(curVertex);
+          // std::cout << "outPolygon add current vertext " << curVertex[0] << " " << curVertex[1] << std::endl;
         }
         else if (check_inside(prevVertex, clipEdge))
+        {
+          // std::cout << "Current vertext " << curVertex[0] << " " << curVertex[1] << " not inside clip edge" << std::endl;
+          // std::cout << "Previous vertext " << prevVertex[0] << " " << prevVertex[1] << " inside clip edge" << std::endl;
           outPolygon.vertices.push_back(intersection);
+          // std::cout << "outPolygon add intersection " << intersection[0] << " " << intersection[1] << std::endl;
+        }
       }
+      this->vertices = outPolygon.vertices;
     }
-    *this = outPolygon;
+    this->vertices = outPolygon.vertices;
+  }
+
+  Vector compute_centroid()
+  {
+    Vector centroid;
+    double area = this->get_area();
+    double pos_x = 0;
+    double pos_y = 0;
+    for (int i = 0; i < vertices.size() - 1; i++)
+    {
+      double xi = vertices[i][0];
+      double xip1 = vertices[i + 1][0];
+      double yi = vertices[i][1];
+      double yip1 = vertices[i + 1][1];
+      pos_x += (xi + xip1) * (xi * yip1 - xip1 * yi);
+      pos_y += (yi + yip1) * (xi * yip1 - xip1 * yi);
+    }
+    pos_x /= (6 * area);
+    pos_y /= (6 * area);
+    centroid[0] = pos_x;
+    centroid[1] = pos_y;
+    return centroid;
   }
 };
+
+int sgn(double num)
+{
+  if (num < 0)
+  {
+    return -1;
+  }
+  return 1;
+}
 
 // saves a static svg file. The polygon vertices are supposed to be in the range [0..1], and a canvas of size 1000x1000 is created
 void save_svg(const std::vector<Polygon> &polygons, const std::vector<Vector> &vertices, std::string filename, std::string fillcol = "none")
@@ -273,24 +343,24 @@ void save_svg(const std::vector<Polygon> &polygons, const std::vector<Vector> &v
 }
 
 // saves a static svg file. The polygon vertices are supposed to be in the range [0..1], and a canvas of size 1000x1000 is created
-void save_svg(const std::vector<Polygon> &polygons, std::string filename, std::string fillcol = "none")
-{
-  FILE *f = fopen(filename.c_str(), "w+");
-  fprintf(f, "<svg xmlns = \"http://www.w3.org/2000/svg\" width = \"1000\" height = \"1000\">\n");
-  for (int i = 0; i < polygons.size(); i++)
-  {
-    fprintf(f, "<g>\n");
-    fprintf(f, "<polygon points = \"");
-    for (int j = 0; j < polygons[i].vertices.size(); j++)
-    {
-      fprintf(f, "%3.3f, %3.3f ", (polygons[i].vertices[j][0] * 1000), (1000 - polygons[i].vertices[j][1] * 1000));
-    }
-    fprintf(f, "\"\nfill = \"%s\" stroke = \"black\"/>\n", fillcol.c_str());
-    fprintf(f, "</g>\n");
-  }
-  fprintf(f, "</svg>\n");
-  fclose(f);
-}
+// void save_svg(const std::vector<Polygon> &polygons, std::string filename, std::string fillcol = "none")
+// {
+//   FILE *f = fopen(filename.c_str(), "w+");
+//   fprintf(f, "<svg xmlns = \"http://www.w3.org/2000/svg\" width = \"1000\" height = \"1000\">\n");
+//   for (int i = 0; i < polygons.size(); i++)
+//   {
+//     fprintf(f, "<g>\n");
+//     fprintf(f, "<polygon points = \"");
+//     for (int j = 0; j < polygons[i].vertices.size(); j++)
+//     {
+//       fprintf(f, "%3.3f, %3.3f ", (polygons[i].vertices[j][0] * 1000), (1000 - polygons[i].vertices[j][1] * 1000));
+//     }
+//     fprintf(f, "\"\nfill = \"%s\" stroke = \"black\"/>\n", fillcol.c_str());
+//     fprintf(f, "</g>\n");
+//   }
+//   fprintf(f, "</svg>\n");
+//   fclose(f);
+// }
 
 // Adds one frame of an animated svg file. frameid is the frame number (between 0 and nbframes-1).
 // polygons is a list of polygons, describing the current frame.
@@ -357,7 +427,7 @@ std::vector<Polygon> compute_voronoi(std::vector<Vector> points, const double *w
   std::vector<Polygon> polygons_list;
   std::vector<Vector> square_vertices = {Vector(1, 0), Vector(1, 1), Vector(0, 1), Vector(0, 0)};
   Polygon subject_polygon = Polygon(square_vertices);
-  // polygons_list.push_back(subject_polygon);
+
   for (int i = 0; i < points.size(); i++)
   {
     std::vector<Vector> my_vertices = {Vector(1, 0), Vector(1, 1), Vector(0, 1), Vector(0, 0)};
@@ -385,7 +455,8 @@ struct data
   double *lambdas;
 };
 
-static lbfgsfloatval_t evaluate(
+static lbfgsfloatval_t
+evaluate(
     void *instance,
     const lbfgsfloatval_t *x,
     lbfgsfloatval_t *g,
@@ -397,14 +468,6 @@ static lbfgsfloatval_t evaluate(
   double *l = params->lambdas;
   std::vector<double> s;
   std::vector<Polygon> polygons = compute_voronoi(p, x);
-  // std::cout << "Number of polygons is: " << polygons.size() << std::endl;
-  // std::cout << " " << std::endl;
-  // for (int c = 0; c < polygons.size(); c++)
-  // {
-  //   polygons[c].print_vertices();
-  // }
-  // std::cout << " " << std::endl;
-  // std::cout << " " << std::endl;
 
   for (int i = 0; i < polygons.size(); i++)
   {
@@ -418,7 +481,6 @@ static lbfgsfloatval_t evaluate(
   {
     integral_part = 0;
     std::vector<Vector> current_vertices = polygons[i].vertices;
-    // polygons[i].print_vertices();
     int num_vertices = current_vertices.size();
     // std::cout << "Number of vertices: " << num_vertices << std::endl;
     // std::cout << " " << std::endl;
@@ -447,8 +509,6 @@ static lbfgsfloatval_t evaluate(
     if (num_vertices > 2)
     {
       Vector o = current_vertices[0];
-      // std::cout << "Root vertice: " << o[0] << " " << o[1] << std::endl;
-      // std::cout << " " << std::endl;
       polygon_integral = 0;
       for (int j = 1; j + 1 < num_vertices; j++)
       {
@@ -458,12 +518,6 @@ static lbfgsfloatval_t evaluate(
         triangle_vertices.push_back(o);
         triangle_vertices.push_back(a);
         triangle_vertices.push_back(b);
-        // std::cout << "Vertices of triangle:" << std::endl;
-        // for (int ver = 0; ver < 3; ver++)
-        // {
-        //   std::cout << triangle_vertices[ver][0] << " " << triangle_vertices[ver][1] << std::endl;
-        // }
-        // std::cout << " " << std::endl;
         double current_sum = 0;
         for (int v1 = 0; v1 < 3; v1++)
         {
@@ -484,14 +538,126 @@ static lbfgsfloatval_t evaluate(
 
     fx += polygon_integral - x[i] * (s[i] - l[i]);
     g[i] = s[i] - l[i];
-    // std::cout << "Real area: " << s[i] << ", Wanted area: " << l[i] << std::endl;
-    // std::cout << " " << std::endl;
   }
-  // std::cout << fx << std::endl;
-  // std::cout << "another iteration over" << std::endl;
-  // std::cout << "another iteration over" << std::endl;
-  // std::cout << "another iteration over" << std::endl;
-  // std::cout << "another iteration over" << std::endl;
+  return -1 * fx;
+}
+
+Polygon generate_disk(Vector center, double radius, int num_edges = 20)
+{
+  std::vector<Vector> vertices;
+  for (int i = 0; i < num_edges; i++)
+  {
+    Vector current_vertext;
+    current_vertext[0] = center[0] + radius * cos(2 * i * M_PI / num_edges);
+    current_vertext[1] = center[1] + radius * sin(2 * i * M_PI / num_edges);
+    vertices.push_back(current_vertext);
+  }
+  Polygon out_polygon = Polygon(vertices);
+
+  // out_polygon.print_vertices();
+  return out_polygon;
+}
+
+std::vector<Polygon> intersect_disks(std::vector<Vector> points, double *weights, int num_edges = 100)
+{
+  std::vector<Polygon> polygons = compute_voronoi(points, weights);
+  std::vector<double> radii;
+  // std::cout << points.size() << std::endl;
+  for (int r = 0; r < points.size(); r++)
+  {
+    // std::cout << "Weights[r]: " << weights[r] << ", weights[air]: " << weights[points.size()] << std::endl;
+    radii.push_back(sqrt(weights[r] - weights[points.size()]));
+    // std::cout << "Radius " << r << "th: " << sqrt(weights[r] - weights[points.size()]) << std::endl;
+  }
+  for (int i = 0; i < polygons.size(); i++)
+  {
+    Polygon clip_polygon = generate_disk(points[i], radii[i]);
+    polygons[i].clip_polygon(clip_polygon);
+  }
+  return polygons;
+}
+
+struct fluid_data
+{
+  std::vector<Vector> *points;
+  double dfv;
+};
+
+static lbfgsfloatval_t fluid_evaluate(
+    void *instance,
+    const lbfgsfloatval_t *x,
+    lbfgsfloatval_t *g,
+    const int n,
+    const lbfgsfloatval_t step)
+{
+  fluid_data *params = (fluid_data *)instance;
+  std::vector<Vector> p = *(params->points);
+  double desired_fluid_volumn = params->dfv;
+  std::vector<double> s;
+  std::vector<Polygon> polygons = compute_voronoi(p, x);
+
+  for (int i = 0; i < polygons.size(); i++)
+  {
+    Polygon clip_polygon = generate_disk(p[i], sqrt(x[i] - x[n - 1]));
+    polygons[i].clip_polygon(clip_polygon);
+    s.push_back(polygons[i].get_area());
+  }
+
+  lbfgsfloatval_t fx = 0.0;
+  double integral_part;
+  double polygon_integral;
+  for (int i = 0; i < n - 1; i++)
+  {
+    integral_part = 0;
+    std::vector<Vector> current_vertices = polygons[i].vertices;
+    int num_vertices = current_vertices.size();
+    if (num_vertices > 2)
+    {
+      Vector o = current_vertices[0];
+      polygon_integral = 0;
+      for (int j = 1; j + 1 < num_vertices; j++)
+      {
+        Vector a = current_vertices[j];
+        Vector b = current_vertices[j + 1];
+        std::vector<Vector> triangle_vertices;
+        triangle_vertices.push_back(o);
+        triangle_vertices.push_back(a);
+        triangle_vertices.push_back(b);
+        double current_sum = 0;
+        for (int v1 = 0; v1 < 3; v1++)
+        {
+          for (int v2 = 0; v2 < v1 + 1; v2++)
+          {
+            current_sum += dot(triangle_vertices[v1] - p[i], triangle_vertices[v2] - p[i]);
+          }
+        }
+        double current_area = abs(cross(b - o, a - o)) / 2;
+        current_sum *= current_area / 6;
+        polygon_integral += current_sum;
+      }
+    }
+    else
+    {
+      polygon_integral = 0;
+    }
+    // std::cout << "Polygon integral: " << polygon_integral << std::endl;
+    fx += polygon_integral + desired_fluid_volumn / (n - 1) * x[i] - s[i] * x[i];
+    g[i] = s[i] - desired_fluid_volumn / (n - 1);
+    // std::cout << "Gradient " << i << "th " << g[i] << std::endl;
+  }
+  double total_area = 0;
+  for (int polygon = 0; polygon < n - 1; polygon++)
+  {
+    // polygons[polygon].print_vertices();
+    total_area += polygons[polygon].get_area();
+  }
+  // std::cout << "Total area: " << total_area << std::endl;
+  double estimated_air_volumn = 1 - total_area;
+  fx += x[n - 1] * (1 - desired_fluid_volumn - estimated_air_volumn);
+  g[n - 1] = estimated_air_volumn - (1 - desired_fluid_volumn);
+  // std::cout << "g_air: " << g[n - 1] << std::endl;
+  // std::cout << "f: " << fx << std::endl;
+  // std::cout << " " << std::endl;
   return -1 * fx;
 }
 
@@ -518,24 +684,72 @@ static int progress(
   return 0;
 }
 
-std::random_device my_random_device;
-std::default_random_engine my_random_engine(my_random_device());
-std::uniform_real_distribution<float> my_distribution(0, 1);
-
-double generate()
+std::vector<Polygon> gallouet_merigot_scheme(std::vector<Vector> &positions,
+                                             std::vector<Vector> &velocities,
+                                             const std::vector<double> &masses,
+                                             double desired_fluid_volume)
 {
-  return my_distribution(my_random_engine);
+  double eps = 0.004;
+  double dt = 0.002;
+  Vector g;
+  g[0] = 0.0;
+  g[1] = -9.8;
+
+  fluid_data *params = new fluid_data();
+  params->points = &positions;
+  params->dfv = desired_fluid_volume;
+  const int n_points = positions.size();
+
+  double *weights = new double[n_points + 1];
+  for (int i = 0; i < positions.size(); i++)
+  {
+    double w = generate_weight();
+    weights[i] = w;
+  }
+  weights[n_points] = 0.6;
+  int ret = lbfgs(positions.size() + 1, weights, NULL, fluid_evaluate, NULL, (void *)params, nullptr);
+  std::cout << ret << std::endl;
+
+  std::vector<Polygon> polygons = intersect_disks(positions, weights);
+  // std::cout << "Intersection to create polygons done!" << std::endl;
+  for (int i = 0; i < positions.size(); i++)
+  {
+    Vector f_spring = (polygons[i].compute_centroid() - positions[i]) / (pow(eps, 2));
+    Vector f = f_spring + masses[i] * g;
+    velocities[i] = velocities[i] + dt * f / masses[i];
+    positions[i] = positions[i] + dt * velocities[i];
+    for (int axis = 0; axis < 2; axis++)
+    {
+      if (positions[i][axis] > 1)
+      {
+        positions[i][axis] = 1;
+        velocities[i][axis] = 0;
+      }
+      else if (positions[i][axis] < 0)
+      {
+        positions[i][axis] = 0;
+        velocities[i][axis] = 0;
+      }
+    }
+    // std::cout << "Point " << i << "th updated" << std::endl;
+  }
+  // std::cout << " " << std::endl;
+  // std::cout << "All points updated!" << std::endl;
+  std::vector<Polygon> new_polygon = intersect_disks(positions, weights);
+  // std::cout << "New polygons created!" << std::endl;
+  return new_polygon;
 }
 
 void generate_diagram()
 {
-  const int n_points = 2000;
+  const int n_points = 20;
+  int nb_frame = 150;
+  std::string filename = "20_points_polygons_2.svg";
   std::vector<Vector> points;
   for (int i = 0; i < n_points; i++)
   {
     double pos1 = generate();
     double pos2 = generate();
-    // std::cout << pos1 << "    " << pos2 << std::endl;
     points.push_back(Vector(pos1, pos2));
   }
 
@@ -572,17 +786,122 @@ void generate_diagram()
   data *params = new data();
   params->points = &points;
   params->lambdas = lambda_arr;
-  int ret = lbfgs(n_points, weights, NULL, evaluate, progress, (void *)params, nullptr);
-  std::cout << ret << std::endl;
-  std::vector<Polygon> lbfsg_weighted_polygons = compute_voronoi(points, weights);
+  // int ret = lbfgs(n_points, weights, NULL, evaluate, progress, (void *)params, nullptr);
+  // std::cout << ret << std::endl;
+  // std::vector<Polygon> lbfsg_weighted_polygons = compute_voronoi(points, weights);
 
-  save_svg(polygons, points, "balance_image.svg");
-  save_svg(weighted_polygons, points, "weighted_image.svg");
-  save_svg(lbfsg_weighted_polygons, points, "lbfsg_weighted_image.svg");
+  // save_svg(polygons, points, "test_balance_image.svg");
+  // save_svg(weighted_polygons, points, "test_weighted_image.svg");
+  // save_svg(lbfsg_weighted_polygons, points, "test_lbfsg_weighted_image.svg");
+
+  std::vector<Vector> vels(n_points);
+  std::vector<double> masses(n_points, 200);
+
+  std::vector<Polygon> animated_polygons;
+
+  // fluid_data *fluid_params = new fluid_data();
+  // fluid_params->points = &points;
+  // fluid_params->dfv = 0.7;
+
+  // double *fluid_weights;
+  // for (int i = 0; i < points.size() + 1; i++)
+  // {
+  //   double w = generate();
+  //   fluid_weights[i] = w / 4;
+  // }
+
+  // int ret_fluid = lbfgs(points.size() + 1, fluid_weights, NULL, fluid_evaluate, progress, (void *)fluid_params, nullptr);
+  // std::cout << ret_fluid << std::endl;
+
+  for (int i = 0; i < nb_frame; i++)
+  {
+    animated_polygons = gallouet_merigot_scheme(points, vels, masses, 0.5);
+    save_svg_animated(animated_polygons, filename, i, nb_frame);
+  }
+  // animated_polygons = gallouet_merigot_scheme(points, vels, masses, 0.7);
+}
+
+void test_clip_disk(int num_edge)
+{
+  std::vector<Vector> square_vertices = {Vector(1, 0), Vector(1, 1), Vector(0, 1), Vector(0, 0)};
+  Polygon subject_polygon = Polygon(square_vertices);
+  Polygon disk = generate_disk(Vector(0.5, 0.5), 0.7, num_edge);
+  subject_polygon.clip_polygon(disk);
+  std::vector<Polygon> pols;
+  std::vector<Vector> ps;
+  pols.push_back(subject_polygon);
+  // pols.push_back(disk);
+  ps.push_back(Vector(0.5, 0.5));
+  save_svg(pols, ps, "disk_intersect_square.svg");
+}
+
+void test_intersect_disk()
+{
+  const int n_p = 30;
+  std::vector<Vector> points;
+  for (int i = 0; i < n_p; i++)
+  {
+    double pos1 = generate();
+    double pos2 = generate();
+    points.push_back(Vector(pos1, pos2));
+  }
+  double weights[n_p + 1];
+  for (int i = 0; i < n_p + 1; i++)
+  {
+    if (i < n_p)
+    {
+      weights[i] = 0.3;
+    }
+    else
+    {
+      weights[i] = 0.05;
+    }
+  }
+  std::vector<Polygon> p = intersect_disks(points, weights, 6);
+  std::vector<Polygon> p1 = compute_voronoi(points, weights);
+  save_svg(p, points, "test_intersect_disk.svg");
+  save_svg(p1, points, "test_voronoi_disk.svg");
+}
+
+void test_fluid_evaluate()
+{
+  const int n_points = 10;
+  double desired_fluid_volume = 0.1;
+  std::vector<Vector> positions;
+  for (int i = 0; i < n_points; i++)
+  {
+    double pos1 = generate();
+    double pos2 = generate();
+    positions.push_back(Vector(pos1, pos2));
+  }
+
+  double weights[n_points + 1];
+  for (int i = 0; i < n_points; i++)
+  {
+    double w = generate_weight();
+    weights[i] = w;
+    std::cout << "Weight of fluid " << i << "th: " << weights[i] << std::endl;
+  }
+  weights[n_points] = 0.6;
+  std::cout << "Weight of air: " << weights[n_points] << std::endl;
+
+  fluid_data *params = new fluid_data();
+  params->points = &positions;
+  params->dfv = desired_fluid_volume;
+
+  int ret = lbfgs(n_points + 1, weights, NULL, fluid_evaluate, progress, (void *)params, nullptr);
+  std::cout << "Status of lbfgs: " << ret << std::endl;
+  std::vector<Polygon> output_polygons = intersect_disks(positions, weights, 6);
+  save_svg(output_polygons, positions, "test_fluid.svg");
 }
 
 int main(int argc, char **argv)
 {
   generate_diagram();
+  // test_intersect_disk();
+  // Polygon a = generate_disk(Vector(0, 0), 2, 4);
+  // test_intersect_disk();
+  // test_fluid_evaluate();
+
   return 0;
 }
