@@ -562,12 +562,9 @@ std::vector<Polygon> intersect_disks(std::vector<Vector> points, double *weights
 {
   std::vector<Polygon> polygons = compute_voronoi(points, weights);
   std::vector<double> radii;
-  // std::cout << points.size() << std::endl;
   for (int r = 0; r < points.size(); r++)
   {
-    // std::cout << "Weights[r]: " << weights[r] << ", weights[air]: " << weights[points.size()] << std::endl;
     radii.push_back(sqrt(weights[r] - weights[points.size()]));
-    // std::cout << "Radius " << r << "th: " << sqrt(weights[r] - weights[points.size()]) << std::endl;
   }
   for (int i = 0; i < polygons.size(); i++)
   {
@@ -640,24 +637,17 @@ static lbfgsfloatval_t fluid_evaluate(
     {
       polygon_integral = 0;
     }
-    // std::cout << "Polygon integral: " << polygon_integral << std::endl;
     fx += polygon_integral + desired_fluid_volumn / (n - 1) * x[i] - s[i] * x[i];
     g[i] = s[i] - desired_fluid_volumn / (n - 1);
-    // std::cout << "Gradient " << i << "th " << g[i] << std::endl;
   }
   double total_area = 0;
   for (int polygon = 0; polygon < n - 1; polygon++)
   {
-    // polygons[polygon].print_vertices();
     total_area += polygons[polygon].get_area();
   }
-  // std::cout << "Total area: " << total_area << std::endl;
   double estimated_air_volumn = 1 - total_area;
   fx += x[n - 1] * (1 - desired_fluid_volumn - estimated_air_volumn);
   g[n - 1] = estimated_air_volumn - (1 - desired_fluid_volumn);
-  // std::cout << "g_air: " << g[n - 1] << std::endl;
-  // std::cout << "f: " << fx << std::endl;
-  // std::cout << " " << std::endl;
   return -1 * fx;
 }
 
@@ -711,7 +701,6 @@ std::vector<Polygon> gallouet_merigot_scheme(std::vector<Vector> &positions,
   std::cout << ret << std::endl;
 
   std::vector<Polygon> polygons = intersect_disks(positions, weights);
-  // std::cout << "Intersection to create polygons done!" << std::endl;
   for (int i = 0; i < positions.size(); i++)
   {
     Vector f_spring = (polygons[i].compute_centroid() - positions[i]) / (pow(eps, 2));
@@ -731,20 +720,13 @@ std::vector<Polygon> gallouet_merigot_scheme(std::vector<Vector> &positions,
         velocities[i][axis] = 0;
       }
     }
-    // std::cout << "Point " << i << "th updated" << std::endl;
   }
-  // std::cout << " " << std::endl;
-  // std::cout << "All points updated!" << std::endl;
   std::vector<Polygon> new_polygon = intersect_disks(positions, weights);
-  // std::cout << "New polygons created!" << std::endl;
   return new_polygon;
 }
 
-void generate_diagram()
-{
-  const int n_points = 20;
-  int nb_frame = 150;
-  std::string filename = "20_points_polygons_2.svg";
+void generate_voronoi() {
+  const int n_points = 10;
   std::vector<Vector> points;
   for (int i = 0; i < n_points; i++)
   {
@@ -767,6 +749,30 @@ void generate_diagram()
     balance_weights[i] = w;
   }
 
+  std::vector<Polygon> polygons = compute_voronoi(points, balance_weights);
+  std::vector<Polygon> weighted_polygons = compute_voronoi(points, weights);
+
+  save_svg(polygons, points, "test_balance_image.svg");
+  save_svg(weighted_polygons, points, "test_weighted_image.svg");
+}
+
+void generate_optimized_voronoi() {
+  const int n_points = 200;
+  std::vector<Vector> points;
+  for (int i = 0; i < n_points; i++)
+  {
+    double pos1 = generate();
+    double pos2 = generate();
+    points.push_back(Vector(pos1, pos2));
+  }
+
+  double weights[n_points];
+  for (int i = 0; i < n_points; i++)
+  {
+    double w = generate();
+    weights[i] = w / 4;
+  }
+
   double lambda_arr[n_points];
   const Vector C = Vector(0.5, 0.5);
   double sum_lambdas = 0;
@@ -780,45 +786,39 @@ void generate_diagram()
     lambda_arr[i] /= sum_lambdas;
   }
 
-  std::vector<Polygon> polygons = compute_voronoi(points, balance_weights);
-  std::vector<Polygon> weighted_polygons = compute_voronoi(points, weights);
-
   data *params = new data();
   params->points = &points;
   params->lambdas = lambda_arr;
-  // int ret = lbfgs(n_points, weights, NULL, evaluate, progress, (void *)params, nullptr);
-  // std::cout << ret << std::endl;
-  // std::vector<Polygon> lbfsg_weighted_polygons = compute_voronoi(points, weights);
+  int ret = lbfgs(n_points, weights, NULL, evaluate, NULL, (void *)params, nullptr);
+  std::cout << ret << std::endl;
+  std::vector<Polygon> lbfsg_weighted_polygons = compute_voronoi(points, weights);
 
-  // save_svg(polygons, points, "test_balance_image.svg");
-  // save_svg(weighted_polygons, points, "test_weighted_image.svg");
-  // save_svg(lbfsg_weighted_polygons, points, "test_lbfsg_weighted_image.svg");
+
+  save_svg(lbfsg_weighted_polygons, points, "test_lbfsg_weighted_image.svg");
+}
+
+void fluid_simulation()
+{
+  const int n_points = 20;
+  int nb_frame = 150;
+  std::vector<Vector> points;
+  for (int i = 0; i < n_points; i++)
+  {
+    double pos1 = generate();
+    double pos2 = generate();
+    points.push_back(Vector(pos1, pos2));
+  }
 
   std::vector<Vector> vels(n_points);
   std::vector<double> masses(n_points, 200);
 
   std::vector<Polygon> animated_polygons;
 
-  // fluid_data *fluid_params = new fluid_data();
-  // fluid_params->points = &points;
-  // fluid_params->dfv = 0.7;
-
-  // double *fluid_weights;
-  // for (int i = 0; i < points.size() + 1; i++)
-  // {
-  //   double w = generate();
-  //   fluid_weights[i] = w / 4;
-  // }
-
-  // int ret_fluid = lbfgs(points.size() + 1, fluid_weights, NULL, fluid_evaluate, progress, (void *)fluid_params, nullptr);
-  // std::cout << ret_fluid << std::endl;
-
   for (int i = 0; i < nb_frame; i++)
   {
     animated_polygons = gallouet_merigot_scheme(points, vels, masses, 0.5);
-    save_svg_animated(animated_polygons, filename, i, nb_frame);
+    save_svg_animated(animated_polygons, "test_fluid_simulation.svg", i, nb_frame);
   }
-  // animated_polygons = gallouet_merigot_scheme(points, vels, masses, 0.7);
 }
 
 void test_clip_disk(int num_edge)
@@ -929,11 +929,17 @@ std::vector<Vector> tutte_embedding(std::vector<Vector> vertices, std::vector<Ve
 
 int main(int argc, char **argv)
 {
-  generate_diagram();
+  // The 3 following functions are created to test helping functions
+
   // test_intersect_disk();
-  // Polygon a = generate_disk(Vector(0, 0), 2, 4);
   // test_intersect_disk();
   // test_fluid_evaluate();
 
+  // The 3 following functions are created to run the 3 labs, in order: lab 6, lab 7, lab 8
+
+  // generate_voronoi();
+  // generate_optimized_voronoi();
+  fluid_simulation();
+  
   return 0;
 }
