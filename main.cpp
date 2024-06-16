@@ -934,7 +934,7 @@ int main(int argc, char **argv)
   // The 3 following functions are created to test helping functions
 
   // test_intersect_disk();
-  // test_intersect_disk();
+  // test_clip_disk();
   // test_fluid_evaluate();
 
   // The 3 following functions are created to run the 3 labs, in order: lab 6 and first half of lab 7, second half of lab 7, lab 8
