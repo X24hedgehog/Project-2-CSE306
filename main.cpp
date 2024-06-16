@@ -15,6 +15,7 @@
 #include "lbfgs.h"
 // #include <stb_image_write.h>
 #include <sstream>
+#include <chrono>
 
 std::random_device my_random_device;
 std::default_random_engine my_random_engine(my_random_device());
@@ -726,7 +727,7 @@ std::vector<Polygon> gallouet_merigot_scheme(std::vector<Vector> &positions,
 }
 
 void generate_voronoi() {
-  const int n_points = 10;
+  const int n_points = 2000;
   std::vector<Vector> points;
   for (int i = 0; i < n_points; i++)
   {
@@ -757,7 +758,7 @@ void generate_voronoi() {
 }
 
 void generate_optimized_voronoi() {
-  const int n_points = 200;
+  const int n_points = 1000;
   std::vector<Vector> points;
   for (int i = 0; i < n_points; i++)
   {
@@ -929,17 +930,21 @@ std::vector<Vector> tutte_embedding(std::vector<Vector> vertices, std::vector<Ve
 
 int main(int argc, char **argv)
 {
+  auto start = std::chrono::high_resolution_clock::now();
   // The 3 following functions are created to test helping functions
 
   // test_intersect_disk();
   // test_intersect_disk();
   // test_fluid_evaluate();
 
-  // The 3 following functions are created to run the 3 labs, in order: lab 6, lab 7, lab 8
+  // The 3 following functions are created to run the 3 labs, in order: lab 6 and first half of lab 7, second half of lab 7, lab 8
 
   // generate_voronoi();
-  // generate_optimized_voronoi();
-  fluid_simulation();
+  generate_optimized_voronoi();
+  // fluid_simulation();
+  auto end = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double> duration = end - start;
+  std::cout << "Execution time: " << duration.count() << " seconds." << std::endl;
   
   return 0;
 }
